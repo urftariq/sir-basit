@@ -1,9 +1,12 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_mwff/login_screen.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 class DashBoardScreen extends StatefulWidget {
@@ -19,18 +22,43 @@ class _DashBoardScreenState extends State<DashBoardScreen> {
   TextEditingController userAddress = TextEditingController();
   TextEditingController userEmail = TextEditingController();
   TextEditingController userPassword = TextEditingController();
+  String uEmail = '';
 
+  Future getUserCred()async{
+    SharedPreferences userCred = await SharedPreferences.getInstance();
+    return userCred.getString("userEmail");
+  }
+
+  void userLogout()async{
+    await FirebaseAuth.instance.signOut();
+    SharedPreferences userCred = await SharedPreferences.getInstance();
+    userCred.clear();
+    if(context.mounted){
+      Navigator.push(context,  MaterialPageRoute(builder: (context) => const LoginScreen(),));
+    }
+  }
 
   void userAddWithImage()async{
-    String userID = const Uuid().v1();
+    try{
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: userEmail.text,
+          password: userPassword.text);
+      SharedPreferences userCred = await SharedPreferences.getInstance();
+      userCred.setString("userEmail", userEmail.text);
+      String userID = const Uuid().v1();
 
-    // User Image with ID
-    UploadTask uploadTask = FirebaseStorage.instance.ref().child("UserImages/").child(userID).putFile(userProfile!);
-    TaskSnapshot taskSnapshot = await uploadTask;
-    String userImage = await taskSnapshot.ref.getDownloadURL();
+      // User Image with ID
+      UploadTask uploadTask = FirebaseStorage.instance.ref().child("UserImages/").child(userID).putFile(userProfile!);
+      TaskSnapshot taskSnapshot = await uploadTask;
+      String userImage = await taskSnapshot.ref.getDownloadURL();
 
-    // User Data with ID
-    userAdd(userID: userID, userImage: userImage);
+      // User Data with ID
+      userAdd(userID: userID, userImage: userImage);
+    }on FirebaseAuthException catch(ex){
+      if(context.mounted){
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ex.code.toString())));
+      }
+    }
   }
 
   void userAdd({String? userID, String? userImage})async{
@@ -56,11 +84,23 @@ class _DashBoardScreenState extends State<DashBoardScreen> {
   }
 
   File? userProfile;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    getUserCred().then((value) {
+      setState(() {
+        uEmail = value;
+      });
+    },);
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Firebase CRUD"),
+        title: Text(uEmail),
         actions: [
           GestureDetector(
             onTap: (){
@@ -105,7 +145,7 @@ class _DashBoardScreenState extends State<DashBoardScreen> {
                   ],
                 );
               },);
-            },
+              },
             child: userProfile == null ?
             const CircleAvatar(
               backgroundImage: NetworkImage('https://cdn3d.iconscout.com/3d/premium/thumb/man-9251877-7590869.png?f=webp'),
@@ -115,6 +155,14 @@ class _DashBoardScreenState extends State<DashBoardScreen> {
               backgroundColor: Colors.blue,
             ),
           ),
+          const SizedBox(
+            width: 14,
+          ),
+
+          IconButton(onPressed: (){
+            userLogout();
+          }, icon: const Icon(Icons.logout)),
+
           const SizedBox(
             width: 14,
           ),
@@ -210,6 +258,7 @@ class _DashBoardScreenState extends State<DashBoardScreen> {
                                       actions: [
                                         TextButton(onPressed: ()async{
                                           await FirebaseFirestore.instance.collection("userData").doc(uID).delete();
+                                          await FirebaseStorage.instance.refFromURL(uImage).delete();
                                           if(context.mounted){
                                             Navigator.pop(context);
                                           }
@@ -223,12 +272,35 @@ class _DashBoardScreenState extends State<DashBoardScreen> {
                               }, icon: const Icon(Icons.delete,color: Colors.red,)),
                               IconButton(onPressed: (){
                                 showBottomSheet(
+                                  // backgroundColor: Colors.red,
                                   context: context,
                                   builder: (context) {
                                     TextEditingController uUserName = TextEditingController();
                                     TextEditingController uUserAddress = TextEditingController();
                                     TextEditingController uUserEmail = TextEditingController();
                                     TextEditingController uUserPassword = TextEditingController();
+
+                                    File? userUpdatedProfile;
+
+                                    void updateUser({String? userImage})async{
+                                      await FirebaseFirestore.instance.collection("userData").doc(uID).update(
+                                          {
+                                            "userName" : uUserName.text,
+                                            "userEmail" : uUserEmail.text,
+                                            "userImage" : userImage,
+                                            "userAddress" : uUserAddress.text,
+                                            "userPassword" : uUserPassword.text
+                                          });
+                                      Navigator.pop(context);
+                                    }
+
+                                    void userUpdateWithImage()async{
+                                      await FirebaseStorage.instance.refFromURL(uImage).delete();
+                                      UploadTask uploadTask = FirebaseStorage.instance.ref().child("UserImages/").child(uID).putFile(userUpdatedProfile!);
+                                      TaskSnapshot taskSnapshot = await uploadTask;
+                                      String userImage = await taskSnapshot.ref.getDownloadURL();
+                                      updateUser(userImage: userImage);
+                                    }
 
                                     uUserName.text = uName;
                                     uUserAddress.text = uAddress;
@@ -244,6 +316,33 @@ class _DashBoardScreenState extends State<DashBoardScreen> {
                                     ),
 
                                         const Text("Update User"),
+                                        const SizedBox(
+                                          height: 20,
+                                        ),
+
+                                        GestureDetector(
+                                          onTap: ()async{
+                                            XFile? selectUpdateImage = await ImagePicker().pickImage(source: ImageSource.gallery);
+                                            if(selectUpdateImage != null){
+                                              File convertUpdatedFile = File(selectUpdateImage.path);
+                                              setState(() {
+                                                userUpdatedProfile = convertUpdatedFile;
+                                              });
+                                            }
+                                            else{
+                                              if(context.mounted){
+                                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Image Not Selected")));
+                                              }
+                                            }
+                                          },
+                                          child: userUpdatedProfile == null ? CircleAvatar(
+                                            radius: 30,
+                                            backgroundImage: NetworkImage(uImage),
+                                          ): CircleAvatar(
+                                            radius: 30,
+                                            backgroundImage: userUpdatedProfile != null ? FileImage(userUpdatedProfile!): null,
+                                          )
+                                        ),
                                         const SizedBox(
                                           height: 20,
                                         ),
@@ -277,14 +376,7 @@ class _DashBoardScreenState extends State<DashBoardScreen> {
                                       ),
 
                                       Center(child: ElevatedButton(onPressed: ()async{
-                                      await FirebaseFirestore.instance.collection("userData").doc(uID).update(
-                                          {
-                                            "userName" : uUserName.text,
-                                            "userEmail" : uUserEmail.text,
-                                            "userAddress" : uUserAddress.text,
-                                            "userPassword" : uUserPassword.text
-                                          });
-                                      Navigator.pop(context);
+                                        userUpdateWithImage();
                                       }, child: const Text("Update User"))),]
                                     ),
                                   );

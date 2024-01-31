@@ -1,8 +1,11 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_mwff/Product/product_fetch.dart';
 import 'package:flutter_mwff/firebase_options.dart';
 import 'package:flutter_mwff/login_screen.dart';
+import 'package:flutter_mwff/tabview_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'home_screen.dart';
 
@@ -21,90 +24,48 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: DashBoardScreen(),
+      home: TabViewScreen(),
     );
   }
 }
 
-class MyHome extends StatefulWidget {
-  const MyHome({super.key});
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
 
   @override
-  State<MyHome> createState() => _MyHomeState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _MyHomeState extends State<MyHome> {
+class _SplashScreenState extends State<SplashScreen> {
 
-  TextEditingController userEmail = TextEditingController();
-  TextEditingController userPassword = TextEditingController();
+  Future getUser()async{
+    SharedPreferences userCred = await SharedPreferences.getInstance();
+    return userCred.getString("userEmail");
+  }
 
-  void userRegister()async{
-    try{
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: userEmail.text,
-          password: userPassword.text);
-      if(context.mounted){
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User Registered")));
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen(),));
+  @override
+  void initState() {
+    // TODO: implement initState
+    getUser().then((value) {
+      if(value !=null ){
+        Timer(const Duration(milliseconds: 2000), () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DashBoardScreen(),)),);
       }
-    } on FirebaseAuthException catch(ex){
-      if(context.mounted){
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ex.code.toString())));
+      else{
+        Timer(const Duration(milliseconds: 2000), () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen(),)),);
       }
-    }
+    },);
+    super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Register Screen"),
-      ),
-      body: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(
-              height: 20,
-            ),
-
-            TextFormField(
-              decoration: const InputDecoration(
-                hintText: "Enter Your Email"
-              ),
-              controller: userEmail,
-            ),
-            TextFormField(
-              decoration: const InputDecoration(
-                  hintText: "Enter Your Password"
-              ),
-              controller: userPassword,
-            ),
-
-            const SizedBox(
-              height: 20,
-            ),
-
-            Center(child: ElevatedButton(onPressed: (){
-              userRegister();
-            }, child: const Text("Register"))),
-
-            const SizedBox(
-              height: 20,
-            ),
-
-            Center(child: TextButton(onPressed: (){
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen(),));
-            }, child: const Text("Go to Login"))),
-
-            const SizedBox(
-              height: 20,
-            ),
-          ],
-        ),
+    return const Scaffold(
+      body: Center(
+        child: Text("Splash Screen"),
       ),
     );
   }
 }
+
 
 

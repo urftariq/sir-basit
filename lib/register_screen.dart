@@ -1,32 +1,27 @@
-import 'dart:io';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_mwff/home_screen.dart';
-import 'package:flutter_mwff/register_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_mwff/login_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class MyHome extends StatefulWidget {
+  const MyHome({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<MyHome> createState() => _MyHomeState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _MyHomeState extends State<MyHome> {
+
   TextEditingController userEmail = TextEditingController();
   TextEditingController userPassword = TextEditingController();
 
   void userRegister()async{
     try{
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: userEmail.text,
           password: userPassword.text);
-      SharedPreferences userCred = await SharedPreferences.getInstance();
-      userCred.setString("userEmail", userEmail.text);
       if(context.mounted){
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User Logged In")));
-          Navigator.push(context,  MaterialPageRoute(builder: (context) => const DashBoardScreen(),));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User Registered")));
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen(),));
       }
     } on FirebaseAuthException catch(ex){
       if(context.mounted){
@@ -39,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Login Screen"),
+        title: const Text("Register Screen"),
       ),
       body: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -68,15 +63,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
             Center(child: ElevatedButton(onPressed: (){
               userRegister();
-            }, child: const Text("Login"))),
+            }, child: const Text("Register"))),
 
             const SizedBox(
               height: 20,
             ),
 
             Center(child: TextButton(onPressed: (){
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const MyHome(),));
-            }, child: const Text("Go to Register"))),
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen(),));
+            }, child: const Text("Go to Login"))),
 
             const SizedBox(
               height: 20,
